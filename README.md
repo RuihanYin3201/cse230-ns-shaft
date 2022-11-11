@@ -1,5 +1,5 @@
 ## Group members:
-Ruihan Yin, Tangzi Yu, Caiwei Wang, Lien-Bee Huang.
+Ruihan Yin, Ziyu Tang, Caiwei Wang, Lien-Bee Huang.
 
 # Project Overview
 
