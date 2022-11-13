@@ -15,8 +15,14 @@ module Shaft (
 import           Control.Lens              hiding ((:<), (:>), (<|), (|>))
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.State
-import           Linear.V2                 (V2 (..), _y)
+import           Linear.V3                 (V3 (..), _x, _y)
 import           System.Random             (Random (..), RandomGen, newStdGen)
+
+height, width :: Int
+height = 40
+width = 20
+
+type Coord = V3 Int
 
 data Game = Game {
     _life         :: Int,
@@ -24,29 +30,24 @@ data Game = Game {
     -- | coordinates of current platforms on the screen
     _curPlatforms :: [Coord],
     _allPlatforms :: [Coord],
+    -- | 0: normal platform; 1: trap
+    _traps        :: [Int],
     _dead         :: Bool
 } deriving (Show)
 
-type Coord = V2 Int
-
 makeLenses ''Game
-
-height, width :: Int
-height = 20
-width = 20
-
-bernoulli :: RandomGen g => Float -> g -> [Int]
-bernoulli p = map (\num -> if num > p then 1 else 0) . randoms
 
 initGame :: IO Game
 initGame = do
-  ap <- randomRs (V2 2 0, V2 (width - 3) 0) <$> newStdGen
-  ts <- bernoulli 0.25 <$> newStdGen
-  let g = Game {
+  ap <- randomRs (V3 2 0 0, V3 (width - 3) 0 0) <$> newStdGen
+  ts <- bernoulli 0.7 <$> newStdGen
+  let
+    g = Game {
     _life = 10,
     _score = 0,
-    _curPlatforms = [head ap],
-    _allPlatforms = tail ap,
+    _curPlatforms = [V3 (width`div`2) 0 0],
+    _allPlatforms = ap,
+    _traps = ts,
     _dead = False
     }
   return g
@@ -56,16 +57,23 @@ nextState g = flip execState g.runMaybeT $ do
   MaybeT $ Just <$> modify move
 
 move :: Game -> Game
-move g@Game {_curPlatforms = ps, _allPlatforms = ap} =
-  if length ps == 10
+move g@Game {_curPlatforms = ps, _allPlatforms = ap, _traps = ts} =
+  if length ps == 15
     then do
       g & curPlatforms .~ (nextPlatform : map goUp (init ps))
         & allPlatforms .~ tail ap
+        & traps .~ tail ts
     else do
       g & curPlatforms .~ (nextPlatform : map goUp ps)
         & allPlatforms .~ tail ap
+        & traps .~ tail ts
   where
-    nextPlatform = head ap
+    hp = head ap
+    nextPlatform = V3 (hp^._x) (hp^._y) (head ts)
 
+-- | helper functions
 goUp :: Coord -> Coord
 goUp c = c & _y +~ 5
+
+bernoulli :: RandomGen g => Float -> g -> [Int]
+bernoulli p = map (\num -> if num > p then 1 else 0) . randoms

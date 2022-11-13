@@ -12,8 +12,20 @@ import           Control.Lens               hiding ((:<), (:>), Empty, (<|),
                                              (|>))
 import           Control.Monad              (forever, void)
 import qualified Graphics.Vty               as V
+import           Linear.V3                  (_z)
 import           Linear.V2                  (V2 (..), _x, _y)
-import           Shaft
+import Shaft
+    ( curPlatforms,
+      height,
+      initGame,
+      life,
+      nextState,
+      score,
+      width,
+      Coord,
+      Game )
+import Data.List (findIndex)
+import Data.Maybe (fromMaybe)
 
 -- Custom ticker event
 data Tick = Tick
@@ -34,20 +46,7 @@ handleEvent g (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt g
 handleEvent g (VtyEvent (V.EvKey V.KEsc []))        = halt g
 handleEvent g _                                     = continue g
 
-main :: IO ()
-main = do
-  -- Ticker
-  chan <- newBChan 10
-  forkIO $ forever $ do
-    writeBChan chan Tick
-    threadDelay 1000000 -- decides how fast your game moves
-
-  g <- initGame
-  let builder = V.mkVty V.defaultConfig
-  initialVty <- builder
-  void $ customMain initialVty builder (Just chan) app g
-
--- draw
+-- | draw
 drawUI :: Game -> [Widget ()]
 drawUI g = [C.center $ padRight (Pad 2) (drawStats g) <+> drawGrid g]
 
@@ -77,23 +76,23 @@ drawGrid g = withBorderStyle BS.unicodeBold
     cellsInRow y = [drawCoord (V2 x y) | x <- [0..width-1]]
     drawCoord    = drawCell . cellAt
     cellAt c
-      | isPlatfrom c g      = Platform
-      | otherwise           = Empty
+      | pos == -1           = Empty
+      | otherwise      = if isTrap then Trap else Platform
+      where
+        pos = fromMaybe (-1) $ findIndex (inPlatfrom c) (g^.curPlatforms)
+        isTrap = ((g^.curPlatforms)!!pos ^._z) == 1
 
-isPlatfrom :: Coord -> Game -> Bool
-isPlatfrom c g = any (inPlatfrom c) (g ^. curPlatforms)
-
-inPlatfrom :: Coord -> Coord -> Bool
+inPlatfrom :: V2 Int -> Coord -> Bool
 inPlatfrom c p = c `elem` [c1, c2, c3, c4, c5]
   where
     y = p ^. _y
     c1 = V2 (p^._x-2) y
     c2 = V2 (p^._x-1) y
-    c3 = p
+    c3 = V2 (p^._x) y
     c4 = V2 (p^._x+1) y
     c5 = V2 (p^._x+2) y
 
--- Cell
+-- | Cell
 data Cell = Platform | Trap | Empty
 
 drawCell :: Cell -> Widget ()
@@ -111,3 +110,17 @@ platformAttr, emptyAttr, trapAttr :: AttrName
 platformAttr = attrName "platformAttr"
 trapAttr = attrName "trapAttr"
 emptyAttr = attrName "emptyAttr"
+
+-- | main
+main :: IO ()
+main = do
+  -- Ticker
+  chan <- newBChan 10
+  forkIO $ forever $ do
+    writeBChan chan Tick
+    threadDelay 1000000 -- decides how fast your game moves
+
+  g <- initGame
+  let builder = V.mkVty V.defaultConfig
+  initialVty <- builder
+  void $ customMain initialVty builder (Just chan) app g
