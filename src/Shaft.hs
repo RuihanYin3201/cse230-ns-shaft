@@ -56,6 +56,9 @@ nextState :: Game -> Game
 nextState g = flip execState g.runMaybeT $ do
   MaybeT $ Just <$> modify move
 
+  -- TODO
+  -- die <|> onPlatfrom <|> fall
+
 move :: Game -> Game
 move g@Game {_curPlatforms = ps, _allPlatforms = ap, _traps = ts} =
   if length ps == 15

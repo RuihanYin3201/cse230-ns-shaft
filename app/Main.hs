@@ -42,6 +42,7 @@ app = App {
 
 handleEvent :: Game -> BrickEvent () Tick -> EventM () (Next Game)
 handleEvent g (AppEvent Tick)                       = continue $ nextState g
+-- TODO | handle <-, -> event from keyboard
 handleEvent g (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt g
 handleEvent g (VtyEvent (V.EvKey V.KEsc []))        = halt g
 handleEvent g _                                     = continue g
