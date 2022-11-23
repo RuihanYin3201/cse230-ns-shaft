@@ -6,13 +6,18 @@ module Shaft (
     life,
     score,
     curPlatforms,
+    myPlayer,
     width,
     height,
     Coord,
-    nextState
+    nextState,
+    playerMoveLeft,
+    playerMoveRight,
+    playerFall
 ) where
 
 import           Control.Lens              hiding ((:<), (:>), (<|), (|>))
+import           Control.Applicative       ((<|>))
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.State
 import           Linear.V3                 (V3 (..), _x, _y)
@@ -30,6 +35,7 @@ data Game = Game {
     -- | coordinates of current platforms on the screen
     _curPlatforms :: [Coord],
     _allPlatforms :: [Coord],
+    _myPlayer :: Coord,
     -- | 0: normal platform; 1: trap
     _traps        :: [Int],
     _dead         :: Bool
@@ -46,6 +52,7 @@ initGame = do
     _life = 10,
     _score = 0,
     _curPlatforms = [V3 (width`div`2) 0 0],
+    _myPlayer = V3 (width`div`2) 30 0,
     _allPlatforms = ap,
     _traps = ts,
     _dead = False
@@ -54,7 +61,23 @@ initGame = do
 
 nextState :: Game -> Game
 nextState g = flip execState g.runMaybeT $ do
-  MaybeT $ Just <$> modify move
+  (MaybeT $ Just <$> modify move)
+
+  -- die <|> onplatform <|>
+  (MaybeT $ Just <$> modify playerFall)
+
+playerMoveLeft :: Game -> Game
+playerMoveLeft g@Game {_myPlayer = p} = g & myPlayer .~ nextPos
+  where nextPos = p & _x -~ 1
+
+playerMoveRight :: Game -> Game
+playerMoveRight g@Game {_myPlayer = p} = g & myPlayer .~ nextPos
+  where nextPos = p & _x +~ 1
+
+playerFall :: Game -> Game
+playerFall g@Game {_myPlayer = p} = g & myPlayer .~ nextPos
+  where nextPos = p & _y -~ 1
+  
 
   -- TODO
   -- die <|> onPlatfrom <|> fall

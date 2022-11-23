@@ -12,18 +12,23 @@ import           Control.Lens               hiding ((:<), (:>), Empty, (<|),
                                              (|>))
 import           Control.Monad              (forever, void)
 import qualified Graphics.Vty               as V
-import           Linear.V3                  (_z)
+import           Linear.V3                  (_z, _xy)
 import           Linear.V2                  (V2 (..), _x, _y)
 import Shaft
     ( curPlatforms,
+      myPlayer,
       height,
       initGame,
       life,
       nextState,
+      playerMoveLeft,
+      playerMoveRight,
+      playerFall,
       score,
       width,
       Coord,
-      Game )
+      Game, 
+      )
 import Data.List (findIndex)
 import Data.Maybe (fromMaybe)
 
@@ -45,6 +50,8 @@ handleEvent g (AppEvent Tick)                       = continue $ nextState g
 -- TODO | handle <-, -> event from keyboard
 handleEvent g (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt g
 handleEvent g (VtyEvent (V.EvKey V.KEsc []))        = halt g
+handleEvent g (VtyEvent (V.EvKey V.KLeft []))       = continue $ playerMoveLeft g
+handleEvent g (VtyEvent (V.EvKey V.KRight []))      = continue $ playerMoveRight g
 handleEvent g _                                     = continue g
 
 -- | draw
@@ -77,11 +84,12 @@ drawGrid g = withBorderStyle BS.unicodeBold
     cellsInRow y = [drawCoord (V2 x y) | x <- [0..width-1]]
     drawCoord    = drawCell . cellAt
     cellAt c
-      | pos == -1           = Empty
+      | pos == -1           = if isPlayer then Player else Empty
       | otherwise      = if isTrap then Trap else Platform
       where
         pos = fromMaybe (-1) $ findIndex (inPlatfrom c) (g^.curPlatforms)
         isTrap = ((g^.curPlatforms)!!pos ^._z) == 1
+        isPlayer = (g^.myPlayer) ^._xy == c
 
 inPlatfrom :: V2 Int -> Coord -> Bool
 inPlatfrom c p = c `elem` [c1, c2, c3, c4, c5]
@@ -94,23 +102,25 @@ inPlatfrom c p = c `elem` [c1, c2, c3, c4, c5]
     c5 = V2 (p^._x+2) y
 
 -- | Cell
-data Cell = Platform | Trap | Empty
+data Cell = Platform | Trap | Empty | Player
 
 drawCell :: Cell -> Widget ()
 drawCell Platform = withAttr platformAttr cellWidget
-drawCell Trap    = withAttr trapAttr cellWidget
+drawCell Trap     = withAttr trapAttr cellWidget
 drawCell Empty    = withAttr emptyAttr cellWidget
+drawCell Player   = withAttr playerAttr cellWidget 
 
 cellWidget :: Widget ()
 cellWidget = str "  "
 
 theMap :: AttrMap
-theMap = attrMap V.defAttr [(platformAttr, V.black `on` V.black), (trapAttr, V.red `on` V.red)]
+theMap = attrMap V.defAttr [(platformAttr, V.black `on` V.black), (trapAttr, V.red `on` V.red), (playerAttr, V.blue `on` V.blue)]
 
-platformAttr, emptyAttr, trapAttr :: AttrName
+platformAttr, emptyAttr, trapAttr, playerAttr :: AttrName
 platformAttr = attrName "platformAttr"
-trapAttr = attrName "trapAttr"
-emptyAttr = attrName "emptyAttr"
+trapAttr     = attrName "trapAttr"
+emptyAttr    = attrName "emptyAttr"
+playerAttr   = attrName "playerAttr"
 
 -- | main
 main :: IO ()
