@@ -3,6 +3,7 @@ module Shaft (
     initGame,
     Game(..),
     life,
+    dead,
     score,
     curPlatforms,
     myPlayer,
@@ -26,6 +27,7 @@ import           System.Random             (Random (..), RandomGen, newStdGen)
 import Data.List (findIndex)
 import Data.Maybe (fromMaybe)
 
+import           Control.Monad             (guard)
 
 height, width :: Int
 height = 40
@@ -73,8 +75,21 @@ nextState :: Game -> Game
 nextState g = flip execState g.runMaybeT $ do
   (MaybeT $ Just <$> modify move)
 
-  -- die <|> onplatform <|>
-  (MaybeT $ Just <$> modify movePlayer)
+  -- die <|> onplatform <|> fall
+  die <|> (MaybeT $ Just <$> modify movePlayer)
+
+dieCond :: Game -> Bool
+dieCond Game {_myPlayer = p, _life = life, _dead = d}
+  | d == True = True
+  | life < 0 = True
+  | (p^._y) < 0 = True
+  | (p^._y) > 40 = True
+  | otherwise = False
+
+die :: MaybeT (State Game) ()
+die = do
+  MaybeT . fmap guard $ dieCond <$> get
+  MaybeT . fmap Just $ dead .= True
 
 playerMoveLeft :: Game -> Game
 playerMoveLeft g@Game {_myPlayer = p} = g & myPlayer .~ nextPos
