@@ -16,6 +16,8 @@ import           Linear.V3                  (_z, _xy)
 import           Linear.V2                  (V2 (..), _x, _y)
 import Shaft
     ( curPlatforms,
+      curPlatformPlayerOn,
+      onTrap,
       myPlayer,
       height,
       initGame,
@@ -23,7 +25,7 @@ import Shaft
       nextState,
       playerMoveLeft,
       playerMoveRight,
-      playerFall,
+      movePlayer,
       score,
       width,
       Coord,
@@ -105,16 +107,16 @@ inPlatfrom c p = c `elem` [c1, c2, c3, c4, c5]
 data Cell = Platform | Trap | Empty | Player
 
 drawCell :: Cell -> Widget ()
+drawCell Player   = withAttr playerAttr cellWidget 
 drawCell Platform = withAttr platformAttr cellWidget
 drawCell Trap     = withAttr trapAttr cellWidget
 drawCell Empty    = withAttr emptyAttr cellWidget
-drawCell Player   = withAttr playerAttr cellWidget 
 
 cellWidget :: Widget ()
 cellWidget = str "  "
 
 theMap :: AttrMap
-theMap = attrMap V.defAttr [(platformAttr, V.black `on` V.black), (trapAttr, V.red `on` V.red), (playerAttr, V.blue `on` V.blue)]
+theMap = attrMap V.defAttr [(platformAttr, V.black `on` V.black), (trapAttr, V.red `on` V.red), (playerAttr, V.white `on` V.white)]
 
 platformAttr, emptyAttr, trapAttr, playerAttr :: AttrName
 platformAttr = attrName "platformAttr"
