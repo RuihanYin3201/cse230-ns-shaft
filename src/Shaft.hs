@@ -28,6 +28,9 @@ import Data.List (findIndex)
 import Data.Maybe (fromMaybe)
 
 import           Control.Monad             (guard)
+import Data.List (findIndex)
+import Data.Maybe (fromMaybe)
+
 
 height, width :: Int
 height = 40
