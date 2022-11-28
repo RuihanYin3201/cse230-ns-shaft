@@ -20,6 +20,7 @@ import Shaft
       height,
       initGame,
       life,
+      dead,
       nextState,
       playerMoveLeft,
       playerMoveRight,
@@ -56,10 +57,10 @@ handleEvent g _                                     = continue g
 
 -- | draw
 drawUI :: Game -> [Widget ()]
-drawUI g = [C.center $ padRight (Pad 2) (drawStats g) <+> drawGrid g]
+drawUI g = [C.center $ padRight (Pad 2) (drawStats g) <+> (drawGrid g)]
 
 drawStats :: Game -> Widget ()
-drawStats g = hLimit 20 $ vBox [drawScore (g ^. score), padTop (Pad 4) $ drawLife $ g ^. life]
+drawStats g = hLimit 20 $ vBox [drawScore (g ^. score), padTop (Pad 4) $ drawLife $ g ^. life, padTop (Pad 8) $ (drawGameOver $ g ^. dead)]
 
 drawScore :: Int -> Widget ()
 drawScore n = withBorderStyle BS.unicodeBold
@@ -91,6 +92,12 @@ drawGrid g = withBorderStyle BS.unicodeBold
         isTrap = ((g^.curPlatforms)!!pos ^._z) == 1
         isPlayer = (g^.myPlayer) ^._xy == c
 
+drawGameOver :: Bool -> Widget () 
+drawGameOver dead = 
+  if dead
+    then withAttr gameOverAttr $ C.hCenter $ str "GAME OVER"
+    else Brick.emptyWidget
+
 inPlatfrom :: V2 Int -> Coord -> Bool
 inPlatfrom c p = c `elem` [c1, c2, c3, c4, c5]
   where
@@ -121,6 +128,7 @@ platformAttr = attrName "platformAttr"
 trapAttr     = attrName "trapAttr"
 emptyAttr    = attrName "emptyAttr"
 playerAttr   = attrName "playerAttr"
+gameOverAttr = attrName "gameOver"
 
 -- | main
 main :: IO ()
