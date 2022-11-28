@@ -24,13 +24,11 @@ import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.State
 import           Linear.V3                 (V3 (..), _x, _y)
 import           System.Random             (Random (..), RandomGen, newStdGen)
+
 import Data.List (findIndex)
 import Data.Maybe (fromMaybe)
 
 import           Control.Monad             (guard)
-import Data.List (findIndex)
-import Data.Maybe (fromMaybe)
-
 
 height, width :: Int
 height = 40
@@ -81,6 +79,7 @@ nextState g = flip execState g.runMaybeT $ do
   (MaybeT $ Just <$> modify move)
 
   -- die <|> onplatform <|> fall
+  
   die <|> (MaybeT $ Just <$> modify movePlayer)
 
 dieCond :: Game -> Bool
