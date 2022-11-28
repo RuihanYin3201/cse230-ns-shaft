@@ -73,6 +73,8 @@ initGame = do
 
 nextState :: Game -> Game
 nextState g = flip execState g.runMaybeT $ do
+  MaybeT $ guard . not <$> use dead
+
   (MaybeT $ Just <$> modify move)
 
   -- die <|> onplatform <|> fall
