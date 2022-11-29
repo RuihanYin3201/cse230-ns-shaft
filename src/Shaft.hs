@@ -25,8 +25,7 @@ import           Control.Monad.Trans.State
 import           Linear.V3                 (V3 (..), _x, _y)
 import           System.Random             (Random (..), RandomGen, newStdGen)
 
-import Data.List (findIndex)
-import Data.Maybe (fromMaybe)
+import Data.List (findIndices)
 
 import           Control.Monad             (guard)
 
@@ -48,7 +47,8 @@ data Game = Game {
     _dead         :: Bool,
     _onPlatform   :: Bool,
     _curPlatformPlayerOn  :: Coord,
-    _onTrap       :: Bool
+    _onTrap       :: Bool,
+    _tickCounter  :: Int
 } deriving (Show)
 
 makeLenses ''Game
@@ -68,7 +68,8 @@ initGame = do
     _dead = False,
     _onPlatform = False,
     _curPlatformPlayerOn = V3 (width`div`2) 20 0,
-    _onTrap = False
+    _onTrap = False,
+    _tickCounter = 1
     }
   return g
 
@@ -76,10 +77,12 @@ nextState :: Game -> Game
 nextState g = flip execState g.runMaybeT $ do
   MaybeT $ guard . not <$> use dead
 
-  (MaybeT $ Just <$> modify move)
+  MaybeT $ Just <$> modify countTick
+
+  MaybeT $ Just <$> modify move
 
   -- die <|> onplatform <|> fall
-  
+
   die <|> (MaybeT $ Just <$> modify movePlayer)
 
 dieCond :: Game -> Bool
@@ -97,86 +100,89 @@ die = do
 
 playerMoveLeft :: Game -> Game
 playerMoveLeft g@Game {_myPlayer = p} = g & myPlayer .~ nextPos
-  where nextPos = p & _x -~ 1
+  where nextPos = if   p ^. _x > 0
+                  then p & _x -~ 1
+                  else p
 
 playerMoveRight :: Game -> Game
 playerMoveRight g@Game {_myPlayer = p} = g & myPlayer .~ nextPos
-  where nextPos = p & _x +~ 1
+  where nextPos = if   p ^. _x < 19
+                  then p & _x +~ 1
+                  else p
 
   -- TODO
   -- die <|> onPlatfrom <|> fall
 
 movePlayer :: Game -> Game
-movePlayer g@Game {_myPlayer = p, _onPlatform = op, _curPlatforms = cp, _curPlatformPlayerOn = cppo, _traps = tps, _score = s, _life = l} = 
-  if pos > -1 
-    -- position = -1 (default),  player not on any platform, free fall
+movePlayer g@Game {_myPlayer = p, _onPlatform = op, _curPlatforms = cp, _curPlatformPlayerOn = cppo, _traps = tps, _score = s, _life = l} =
+  if pos > -1
+    -- position != -1, meaning player on some platform from list, player go up with the same speed as other platforms
     then do
       g & myPlayer .~ (p & _y .~ ((cp!!pos)^._y + 1))
         & onPlatform .~ (pos > -1)
         & curPlatformPlayerOn .~ (cp!!pos)
         & onPlatform .~ (tps!!pos == 0)
         & onTrap .~ ontrap
-
-  else do 
-    -- position != -1, meaning player on some platform from list, player go up with the same speed as other platforms
+  else do
+    -- position = -1 (default),  player not on any platform, free fall
       g & myPlayer .~ (p & _y -~ 1)
         & onPlatform .~ False
         & onTrap .~ False
   where
-    pos = fromMaybe (-1) $ findIndex (aroundPlatform p) (cp)
+    -- pos = fromMaybe (-1) $ findIndex (aroundPlatform p) cp
+    pos = if null idxs then -1 else last idxs
+    idxs = findIndices (aroundPlatform p) cp
     ontrap = (tps!!pos) == 1
 
-updateScore :: Int->Bool->Int 
+updateScore :: Int->Bool->Int
 updateScore oldScore True = oldScore + 1
 updateScore oldScore False = oldScore
 
-updateLife :: Int->Bool->Int 
+updateLife :: Int->Bool->Int
 updateLife oldLife True = oldLife - 1
 updateLife oldLife False = oldLife
-    
-
-
 
 aroundPlatform :: V3 Int -> Coord -> Bool
 aroundPlatform c p = c `elem` [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15]
   where
-    y = p ^. _y 
-    y1 = p ^._y - 1
-    y2 = p^._y + 1
-    c1 = V3 (p^._x-2) y 0
-    c2 = V3 (p^._x-1) y 0
-    c3 = V3 (p^._x) y 0
-    c4 = V3 (p^._x+1) y 0
-    c5 = V3 (p^._x+2) y 0
-    c6 = V3 (p^._x-2) y1 0
-    c7 = V3 (p^._x-1) y1 0
-    c8 = V3 (p^._x) y1 0
-    c9 = V3 (p^._x+1) y1 0
+    y   = p ^. _y +1
+    y1  = p ^._y
+    y2  = p^._y - 1
+    c1  = V3 (p^._x-2) y  0
+    c2  = V3 (p^._x-1) y  0
+    c3  = V3 (p^._x)   y  0
+    c4  = V3 (p^._x+1) y  0
+    c5  = V3 (p^._x+2) y  0
+    c6  = V3 (p^._x-2) y1 0
+    c7  = V3 (p^._x-1) y1 0
+    c8  = V3 (p^._x)   y1 0
+    c9  = V3 (p^._x+1) y1 0
     c10 = V3 (p^._x+2) y1 0
     c11 = V3 (p^._x-2) y2 0
     c12 = V3 (p^._x-1) y2 0
-    c13 = V3 (p^._x) y2 0
+    c13 = V3 (p^._x)   y2 0
     c14 = V3 (p^._x+1) y2 0
     c15 = V3 (p^._x+2) y2 0
 
-
-
-
- 
-  
-
+countTick :: Game -> Game
+countTick g = g & tickCounter +~ 1
 
 move :: Game -> Game
-move g@Game {_curPlatforms = ps, _allPlatforms = ap, _traps = ts} =
-  if length ps == 15
-    then do
-      g & curPlatforms .~ (nextPlatform : map goUp (init ps))
-        & allPlatforms .~ tail ap
-        & traps .~ tail ts
-    else do
-      g & curPlatforms .~ (nextPlatform : map goUp ps)
-        & allPlatforms .~ tail ap
-        & traps .~ tail ts
+move g@Game {_curPlatforms = ps, _allPlatforms = ap, _traps = ts, _tickCounter = tc}
+  | even tc = if length ps == 18
+                  then do
+                    g & curPlatforms .~ map goUp (init ps)
+                  else do
+                    g & curPlatforms .~ map goUp ps
+  | otherwise =   if length ps == 18
+                  then do
+                    g & curPlatforms .~ (nextPlatform : map goUp (init ps))
+                    & allPlatforms .~ tail ap
+                    & traps .~ tail ts
+                  else do
+                    g & curPlatforms .~ (nextPlatform : map goUp ps)
+                    & allPlatforms .~ tail ap
+                    & traps .~ tail ts
 
   where
     hp = head ap
