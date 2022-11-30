@@ -14,7 +14,6 @@ module Shaft (
     playerMoveLeft,
     playerMoveRight,
     movePlayer,
-    curPlatformPlayerOn,
     onTrap
 ) where
 
@@ -22,7 +21,7 @@ import           Control.Lens              hiding ((:<), (:>), (<|), (|>))
 import           Control.Applicative       ((<|>))
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.State
-import           Linear.V3                 (V3 (..), _x, _y)
+import           Linear.V3                 (V3 (..), _x, _y, _z)
 import           System.Random             (Random (..), RandomGen, newStdGen)
 
 import Data.List (findIndices)
@@ -46,7 +45,6 @@ data Game = Game {
     _traps        :: [Int],
     _dead         :: Bool,
     _onPlatform   :: Bool,
-    _curPlatformPlayerOn  :: Coord,
     _onTrap       :: Bool,
     _tickCounter  :: Int
 } deriving (Show)
@@ -67,7 +65,6 @@ initGame = do
     _traps = ts,
     _dead = False,
     _onPlatform = False,
-    _curPlatformPlayerOn = V3 (width`div`2) 20 0,
     _onTrap = False,
     _tickCounter = 1
     }
@@ -78,12 +75,12 @@ nextState g = flip execState g.runMaybeT $ do
   MaybeT $ guard . not <$> use dead
 
   MaybeT $ Just <$> modify countTick
-
   MaybeT $ Just <$> modify move
+  die <|> (MaybeT $ Just <$> modify movePlayer)
 
   -- die <|> onplatform <|> fall
 
-  die <|> (MaybeT $ Just <$> modify movePlayer)
+  
 
 dieCond :: Game -> Bool
 dieCond Game {_myPlayer = p, _life = life, _dead = d}
@@ -114,14 +111,15 @@ playerMoveRight g@Game {_myPlayer = p} = g & myPlayer .~ nextPos
   -- die <|> onPlatfrom <|> fall
 
 movePlayer :: Game -> Game
-movePlayer g@Game {_myPlayer = p, _onPlatform = op, _curPlatforms = cp, _curPlatformPlayerOn = cppo, _traps = tps, _score = s, _life = l} =
+movePlayer g@Game {_myPlayer = p, _onPlatform = op, _curPlatforms = cp, _traps = tps, _score = s, _life = l, _onTrap = ot} =
   if pos > -1
     -- position != -1, meaning player on some platform from list, player go up with the same speed as other platforms
     then do
       g & myPlayer .~ (p & _y .~ ((cp!!pos)^._y + 1))
         & onPlatform .~ (pos > -1)
-        & curPlatformPlayerOn .~ (cp!!pos)
         & onPlatform .~ (tps!!pos == 0)
+        & score .~ updateScore s ontrap op -- score + 1 when previous not on platform, currently not on trap
+        & life .~ updateLife l ot ontrap
         & onTrap .~ ontrap
   else do
     -- position = -1 (default),  player not on any platform, free fall
@@ -132,15 +130,21 @@ movePlayer g@Game {_myPlayer = p, _onPlatform = op, _curPlatforms = cp, _curPlat
     -- pos = fromMaybe (-1) $ findIndex (aroundPlatform p) cp
     pos = if null idxs then -1 else last idxs
     idxs = findIndices (aroundPlatform p) cp
-    ontrap = (tps!!pos) == 1
+    ontrap = (cp!!pos) ^. _z == 1
 
-updateScore :: Int->Bool->Int
-updateScore oldScore True = oldScore + 1
-updateScore oldScore False = oldScore
+updateScore :: Int->Bool->Bool-> Int 
+-- updateScore oldScore currentlyOnTrap previousOnPlatform
+updateScore oldScore False False = oldScore + 1 -- if not on trap, prevOnPlatform = false, currently on platform, then score + 1
+updateScore oldScore _ _ = oldScore -- else, don't change score 
 
-updateLife :: Int->Bool->Int
-updateLife oldLife True = oldLife - 1
-updateLife oldLife False = oldLife
+
+
+updateLife :: Int->Bool->Bool-> Int
+-- updateLife oldLife previousOnTrap currentlyOnTrap
+updateLife oldLife True True = oldLife
+updateLife oldLife False True = oldLife -1
+updateLife oldLife _ False = oldLife
+
 
 aroundPlatform :: V3 Int -> Coord -> Bool
 aroundPlatform c p = c `elem` [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15]

@@ -16,7 +16,6 @@ import           Linear.V3                  (_z, _xy)
 import           Linear.V2                  (V2 (..), _x, _y)
 import Shaft
     ( curPlatforms,
-      curPlatformPlayerOn,
       onTrap,
       myPlayer,
       height,
