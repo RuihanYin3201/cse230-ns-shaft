@@ -14,7 +14,9 @@ module Shaft (
     playerMoveLeft,
     playerMoveRight,
     movePlayer,
-    onTrap
+    onTrap,
+    curInt,
+    interval
 ) where
 
 import           Control.Lens              hiding ((:<), (:>), (<|), (|>))
@@ -27,6 +29,7 @@ import           System.Random             (Random (..), RandomGen, newStdGen)
 import Data.List (findIndices)
 
 import           Control.Monad             (guard)
+import Control.Concurrent.STM
 
 height, width :: Int
 height = 40
@@ -46,13 +49,16 @@ data Game = Game {
     _dead         :: Bool,
     _onPlatform   :: Bool,
     _onTrap       :: Bool,
-    _tickCounter  :: Int
-} deriving (Show)
+    _tickCounter  :: Int,
+    _interval     :: TVar Int,
+    _curInt      :: Int
+-- } deriving (Show)
+}
 
 makeLenses ''Game
 
-initGame :: IO Game
-initGame = do
+initGame :: TVar Int -> IO Game
+initGame tv = do
   ap <- randomRs (V3 2 0 0, V3 (width - 3) 0 0) <$> newStdGen
   ts <- bernoulli 0.7 <$> newStdGen
   let
@@ -66,26 +72,27 @@ initGame = do
     _dead = False,
     _onPlatform = False,
     _onTrap = False,
-    _tickCounter = 1
+    _tickCounter = 1,
+    _interval = tv,
+    _curInt = 1000000
     }
   return g
 
 nextState :: Game -> Game
 nextState g = flip execState g.runMaybeT $ do
   MaybeT $ guard . not <$> use dead
-
+  -- MaybeT $ Just <$> modify speedUp
   MaybeT $ Just <$> modify countTick
   MaybeT $ Just <$> modify move
   die <|> (MaybeT $ Just <$> modify movePlayer)
 
   -- die <|> onplatform <|> fall
 
-  
 
 dieCond :: Game -> Bool
-dieCond Game {_myPlayer = p, _life = life, _dead = d}
+dieCond Game {_myPlayer = p, _life = playerLife, _dead = d}
   | d == True = True
-  | life < 0 = True
+  | playerLife < 0 = True
   | (p^._y) < 0 = True
   | (p^._y) > 40 = True
   | otherwise = False
@@ -142,8 +149,8 @@ updateScore oldScore _ _ = oldScore -- else, don't change score
 updateLife :: Int->Bool->Bool-> Int
 -- updateLife oldLife previousOnTrap currentlyOnTrap
 updateLife oldLife True True = oldLife
-updateLife oldLife False True = oldLife -1
-updateLife oldLife _ False = oldLife
+updateLife oldLife False True = oldLife - 2
+updateLife oldLife _ False = if oldLife == 10 then oldLife else oldLife + 1
 
 
 aroundPlatform :: V3 Int -> Coord -> Bool

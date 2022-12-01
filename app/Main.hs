@@ -16,7 +16,6 @@ import           Linear.V3                  (_z, _xy)
 import           Linear.V2                  (V2 (..), _x, _y)
 import Shaft
     ( curPlatforms,
-      onTrap,
       myPlayer,
       height,
       initGame,
@@ -25,14 +24,17 @@ import Shaft
       nextState,
       playerMoveLeft,
       playerMoveRight,
-      movePlayer,
       score,
       width,
       Coord,
-      Game, 
+      Game,
+      curInt,
+      interval
       )
 import Data.List (findIndex)
 import Data.Maybe (fromMaybe)
+import Control.Concurrent.STM
+import Control.Monad.IO.Class (liftIO)
 
 -- Custom ticker event
 data Tick = Tick
@@ -48,12 +50,20 @@ app = App {
   }
 
 handleEvent :: Game -> BrickEvent () Tick -> EventM () (Next Game)
-handleEvent g (AppEvent Tick)                       = continue $ nextState g
+handleEvent g (AppEvent Tick)                       = do
+  speedUp g
+  continue $ nextState g
 handleEvent g (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt g
 handleEvent g (VtyEvent (V.EvKey V.KEsc []))        = halt g
 handleEvent g (VtyEvent (V.EvKey V.KLeft []))       = continue $ playerMoveLeft g
 handleEvent g (VtyEvent (V.EvKey V.KRight []))      = continue $ playerMoveRight g
 handleEvent g _                                     = continue g
+
+speedUp :: Game -> EventM () (Next Game)
+speedUp g = do
+  let newInt = if g ^. curInt > 150000 then g^.curInt - 150000 else 150000
+  liftIO $ atomically $ writeTVar (g ^. interval) newInt
+  continue $ g & curInt .~ newInt
 
 -- | draw
 drawUI :: Game -> [Widget ()]
@@ -92,8 +102,8 @@ drawGrid g = withBorderStyle BS.unicodeBold
         isTrap = ((g^.curPlatforms)!!pos ^._z) == 1
         isPlayer = (g^.myPlayer) ^._xy == c
 
-drawGameOver :: Bool -> Widget () 
-drawGameOver dead = 
+drawGameOver :: Bool -> Widget ()
+drawGameOver dead =
   if dead
     then withAttr gameOverAttr $ C.hCenter $ str "GAME OVER"
     else Brick.emptyWidget
@@ -112,7 +122,7 @@ inPlatfrom c p = c `elem` [c1, c2, c3, c4, c5]
 data Cell = Platform | Trap | Empty | Player
 
 drawCell :: Cell -> Widget ()
-drawCell Player   = withAttr playerAttr cellWidget 
+drawCell Player   = withAttr playerAttr cellWidget
 drawCell Platform = withAttr platformAttr cellWidget
 drawCell Trap     = withAttr trapAttr cellWidget
 drawCell Empty    = withAttr emptyAttr cellWidget
@@ -135,11 +145,14 @@ main :: IO ()
 main = do
   -- Ticker
   chan <- newBChan 10
+  tv <- newTVarIO 1000000
   forkIO $ forever $ do
     writeBChan chan Tick
-    threadDelay 1000000 -- decides how fast your game moves
+    dly <- readTVarIO tv
+    threadDelay dly
+    -- threadDelay 1000000 -- decides how fast your game moves
 
-  g <- initGame
+  g <- initGame tv
   let builder = V.mkVty V.defaultConfig
   initialVty <- builder
   void $ customMain initialVty builder (Just chan) app g
