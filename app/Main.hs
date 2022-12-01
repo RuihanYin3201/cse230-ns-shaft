@@ -8,33 +8,21 @@ import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center       as C
 
 import           Control.Concurrent         (forkIO, threadDelay)
+import           Control.Concurrent.STM
 import           Control.Lens               hiding ((:<), (:>), Empty, (<|),
                                              (|>))
 import           Control.Monad              (forever, void)
+import           Control.Monad.IO.Class     (liftIO)
+import           Data.List                  (findIndex)
+import           Data.Maybe                 (fromMaybe)
 import qualified Graphics.Vty               as V
-import           Linear.V3                  (_z, _xy)
 import           Linear.V2                  (V2 (..), _x, _y)
-import Shaft
-    ( curPlatforms,
-      myPlayer,
-      height,
-      initGame,
-      life,
-      dead,
-      nextState,
-      playerMoveLeft,
-      playerMoveRight,
-      score,
-      width,
-      Coord,
-      Game,
-      curInt,
-      interval
-      )
-import Data.List (findIndex)
-import Data.Maybe (fromMaybe)
-import Control.Concurrent.STM
-import Control.Monad.IO.Class (liftIO)
+import           Linear.V3                  (_xy, _z)
+import           Shaft                      (Coord, Game, curInt, curPlatforms,
+                                             dead, height, initGame, interval,
+                                             life, myPlayer, nextState,
+                                             playerMoveLeft, playerMoveRight,
+                                             score, width)
 
 -- Custom ticker event
 data Tick = Tick
@@ -67,10 +55,10 @@ speedUp g = do
 
 -- | draw
 drawUI :: Game -> [Widget ()]
-drawUI g = [C.center $ padRight (Pad 2) (drawStats g) <+> (drawGrid g)]
+drawUI g = [C.center $ padRight (Pad 2) (drawStats g) <+> drawGrid g]
 
 drawStats :: Game -> Widget ()
-drawStats g = hLimit 20 $ vBox [drawScore (g ^. score), padTop (Pad 4) $ drawLife $ g ^. life, padTop (Pad 8) $ (drawGameOver $ g ^. dead)]
+drawStats g = hLimit 20 $ vBox [drawScore (g ^. score), padTop (Pad 4) $ drawLife $ g ^. life, padTop (Pad 8) $ drawGameOver (g ^. dead)]
 
 drawScore :: Int -> Widget ()
 drawScore n = withBorderStyle BS.unicodeBold
@@ -103,8 +91,8 @@ drawGrid g = withBorderStyle BS.unicodeBold
         isPlayer = (g^.myPlayer) ^._xy == c
 
 drawGameOver :: Bool -> Widget ()
-drawGameOver dead =
-  if dead
+drawGameOver d =
+  if d
     then withAttr gameOverAttr $ C.hCenter $ str "GAME OVER"
     else Brick.emptyWidget
 
@@ -133,7 +121,7 @@ cellWidget = str "  "
 theMap :: AttrMap
 theMap = attrMap V.defAttr [(platformAttr, V.black `on` V.black), (trapAttr, V.red `on` V.red), (playerAttr, V.white `on` V.white)]
 
-platformAttr, emptyAttr, trapAttr, playerAttr :: AttrName
+platformAttr, emptyAttr, trapAttr, playerAttr, gameOverAttr :: AttrName
 platformAttr = attrName "platformAttr"
 trapAttr     = attrName "trapAttr"
 emptyAttr    = attrName "emptyAttr"
