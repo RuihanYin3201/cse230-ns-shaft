@@ -36,6 +36,7 @@ library
     , lens
     , linear
     , random
+    , stm
     , transformers
   default-language: Haskell2010
 
@@ -52,6 +53,7 @@ executable cse230-ns-shaft-exe
     , cse230-ns-shaft
     , lens
     , linear
+    , stm
     , vty
   default-language: Haskell2010
 
