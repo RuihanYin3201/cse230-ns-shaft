@@ -1,2 +1,6 @@
+import           Shaft
+import           Test.QuickCheck
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = do
+    quickCheck prop_genBernoulliList

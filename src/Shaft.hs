@@ -16,7 +16,8 @@ module Shaft (
     movePlayer,
     onTrap,
     curInt,
-    interval
+    interval,
+    prop_genBernoulliList
 ) where
 
 import           Control.Applicative       ((<|>))
@@ -24,12 +25,13 @@ import           Control.Lens              hiding ((:<), (:>), (<|), (|>))
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.State
 import           Linear.V3                 (V3 (..), _x, _y, _z)
-import           System.Random             (Random (..), RandomGen, newStdGen)
+import           System.Random             (Random (..), mkStdGen, newStdGen)
 
 import           Data.List                 (findIndices)
 
 import           Control.Concurrent.STM
 import           Control.Monad             (guard)
+import           Test.QuickCheck
 
 height, width :: Int
 height = 40
@@ -60,7 +62,8 @@ makeLenses ''Game
 initGame :: TVar Int -> IO Game
 initGame tv = do
   ap <- randomRs (V3 2 0 0, V3 (width - 3) 0 0) <$> newStdGen
-  ts <- bernoulli 0.7 <$> newStdGen
+  let ts = bernoulli 0.7
+  -- ts <- bernoulli 0.7 <$> newStdGen
   let
     g = Game {
     _life = 10,
@@ -203,5 +206,19 @@ move g@Game {_curPlatforms = ps, _allPlatforms = ap, _traps = ts, _tickCounter =
 goUp :: Coord -> Coord
 goUp c = c & _y +~ 2
 
-bernoulli :: RandomGen g => Float -> g -> [Int]
-bernoulli p = map (\num -> if num > p then 1 else 0) . randoms
+bernoulli :: Double -> [Int]
+bernoulli p = map (\num -> if num > p then 1 else 0) . randoms $ mkStdGen 230
+
+
+-- Properties
+prop_genBernoulliList :: Property
+prop_genBernoulliList = forAll genProbAndList (\(p, ls) -> abs (ratio ls - p) <= 0.01)
+  where
+    ratio ls = 1- (fromIntegral (sum ls) / 10000)
+
+genProbAndList :: Gen (Double, [Int])
+genProbAndList = do
+  p <- chooseInt (1, 10)
+  let prob = 1 / fromIntegral p
+  let ls = take 10000 $ bernoulli prob
+  return (prob, ls)

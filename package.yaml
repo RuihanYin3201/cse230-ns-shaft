@@ -41,6 +41,7 @@ library:
   - random
   - transformers
   - stm
+  - QuickCheck
 
 executables:
   cse230-ns-shaft-exe:
@@ -57,6 +58,7 @@ executables:
     - lens
     - linear
     - stm
+    - QuickCheck
 
 tests:
   cse230-ns-shaft-test:
@@ -68,3 +70,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - cse230-ns-shaft
+    - QuickCheck
