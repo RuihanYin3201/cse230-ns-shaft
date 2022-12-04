@@ -138,7 +138,6 @@ main = do
     writeBChan chan Tick
     dly <- readTVarIO tv
     threadDelay dly
-    -- threadDelay 1000000 -- decides how fast your game moves
 
   g <- initGame tv
   let builder = V.mkVty V.defaultConfig
