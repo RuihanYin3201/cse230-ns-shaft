@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 module Shaft (
     initGame,
     Game(..),
@@ -129,7 +130,7 @@ movePlayer g@Game {_myPlayer = p, _onPlatform = onPlf, _curPlatforms = cp, _trap
         & onPlatform .~ (pos > -1)
         & onPlatform .~ (tps!!pos == 0)
         & score .~ updateScore s ontrap onPlf -- score + 1 when previous not on platform, currently not on trap
-        & life .~ updateLife l ot ontrap
+        & life .~ updateLife s l ot ontrap onPlf -- life -1 when on trap, life + 1 when score reaches 10s. 
         & onTrap .~ ontrap
   else do
     -- position = -1 (default),  player not on any platform, free fall
@@ -149,11 +150,14 @@ updateScore oldScore _ _         = oldScore -- else, don't change score
 
 
 
-updateLife :: Int->Bool->Bool-> Int
+updateLife :: Int-> Int->Bool->Bool->Bool-> Int
 -- updateLife oldLife previousOnTrap currentlyOnTrap
-updateLife oldLife True True  = oldLife
-updateLife oldLife False True = oldLife - 2
-updateLife oldLife _ False    = if oldLife == 10 then oldLife else oldLife + 1
+updateLife oldScore oldLife True True _ = oldLife
+updateLife oldScore oldLife False True _ = oldLife - 2
+updateLife oldScore oldLife _ False False 
+  | oldScore `mod` 10 == 0      = if oldLife < 10 then oldLife + 1 else oldLife 
+  | otherwise                   = oldLife
+updateLife oldScore oldLife _ _ _ = oldLife
 
 
 aroundPlatform :: V3 Int -> Coord -> Bool
