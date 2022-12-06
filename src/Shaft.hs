@@ -96,7 +96,7 @@ nextState g = flip execState g.runMaybeT $ do
 dieCond :: Game -> Bool
 dieCond Game {_myPlayer = p, _life = playerLife, _dead = d}
   | d == True = True
-  | playerLife < 0 = True
+  | playerLife <= 0 = True
   | (p^._y) < 0 = True
   | (p^._y) > 40 = True
   | otherwise = False
